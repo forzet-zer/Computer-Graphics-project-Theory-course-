@@ -180,6 +180,10 @@ glm::vec3 balonPos = balonReposo;
 float balonRot = 0.0f;
 
 // Animacion por codigo del balon (tecla B): bota en su lugar girando
+// Mesa de Gabriel (tecla M): se acomoda junto a la cancha o se guarda, con una animacion suave
+bool mesaPuesta = true;     // destino de la animacion
+float mesaAvance = 1.0f;    // 0 = guardada, 1 = puesta
+
 // Fresnel en el mar (tecla F lo activa/desactiva para comparar con Phong)
 bool fresnelMar = true;
 
@@ -365,6 +369,9 @@ int main()
 
 	// Balon de Gabriel (radio 1 en Blender -> 0.105 m, tamano real de un balon de voleibol)
 	Model BalonYuki((char*)"../Blender Models/Gabriel_Yukioayax/BalonVoley/BalonVoley.obj");
+
+	// Mesa de Gabriel (escala 0.38 -> 0.75 m de alto, ~4.4 m de largo). Textura de madera temporal.
+	Model MesaYuki((char*)"../Blender Models/Gabriel_Yukioayax/mesa/mesa.obj");
 
 	Model Sea((char*)"Models/sea.obj");
 	// Textura del cielo para el reflejo Fresnel del mar (la misma del skysphere, equirectangular)
@@ -891,6 +898,24 @@ int main()
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBalon));
 		BalonYuki.Draw(lightingShader);
 
+		// Mesa: avanza hacia su destino en 1.5 s; la posicion usa smoothstep (arranca y frena suave),
+		// sube en arco mientras se mueve (como si la cargaran) y gira 90 grados entre las dos poses
+		float mesaObjetivo = mesaPuesta ? 1.0f : 0.0f;
+		float mesaPaso = deltaTime / 1.5f;
+		if (mesaAvance < mesaObjetivo) mesaAvance = glm::min(mesaAvance + mesaPaso, mesaObjetivo);
+		if (mesaAvance > mesaObjetivo) mesaAvance = glm::max(mesaAvance - mesaPaso, mesaObjetivo);
+		float e = mesaAvance * mesaAvance * (3.0f - 2.0f * mesaAvance);
+		glm::vec3 mesaGuardada(-12.0f, 0.276f, 21.0f);   // arena (capa superior): y = 0.001 + 0.275
+		glm::vec3 mesaLugar(-7.0f, 0.276f, 15.0f);       // arena (capa superior): y = 0.001 + 0.275
+		glm::vec3 mesaPos = glm::mix(mesaGuardada, mesaLugar, e);
+		mesaPos.y += sin(e * 3.14159f) * 0.5f;
+		glm::mat4 modelMesa = glm::mat4(1.0f);
+		modelMesa = glm::translate(modelMesa, mesaPos);
+		modelMesa = glm::rotate(modelMesa, glm::radians(glm::mix(90.0f, 0.0f, e)), glm::vec3(0.0f, 1.0f, 0.0f));
+		modelMesa = glm::scale(modelMesa, glm::vec3(0.38f));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMesa));
+		MesaYuki.Draw(lightingShader);
+
 		// Reflector (spotlight.obj)
 		glm::mat4 modelReflector = glm::mat4(1.0f);
 		modelReflector = glm::translate(modelReflector, spotPos);
@@ -1046,6 +1071,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		play = FrameIndex >= 2;
 		balonBotando = false;
 		interpolation();
+	}
+
+	if (key == GLFW_KEY_M && action == GLFW_PRESS)
+	{
+		mesaPuesta = !mesaPuesta;
 	}
 
 	if (key == GLFW_KEY_F && action == GLFW_PRESS)

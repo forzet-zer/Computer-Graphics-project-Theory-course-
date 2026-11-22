@@ -180,6 +180,9 @@ glm::vec3 balonPos = balonReposo;
 float balonRot = 0.0f;
 
 // Animacion por codigo del balon (tecla B): bota en su lugar girando
+// Fresnel en el mar (tecla F lo activa/desactiva para comparar con Phong)
+bool fresnelMar = true;
+
 bool balonBotando = false;
 float balonTiempoBote = 0.0f;
 
@@ -364,6 +367,8 @@ int main()
 	Model BalonYuki((char*)"../Blender Models/Gabriel_Yukioayax/BalonVoley/BalonVoley.obj");
 
 	Model Sea((char*)"Models/sea.obj");
+	// Textura del cielo para el reflejo Fresnel del mar (la misma del skysphere, equirectangular)
+	GLuint texCieloReflejo = TextureFromFile("Hazy_Afternoon_Backplate_001.png", "Models");
 	Model Mountein((char*)"Models/mounteindew.obj");
 
 	// ---------------------------------------------------------------------------------------
@@ -737,7 +742,17 @@ int main()
 		glm::mat4 modelSea = glm::mat4(1.0f);
 		modelSea = glm::translate(modelSea, glm::vec3(0.0f, -2.0f, 0.0f));
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelSea));
+		// Fresnel solo para el mar: cielo en la unidad de textura 1, ondas con el tiempo
+		glUniform1i(glGetUniformLocation(lightingShader.Program, "fresnel"), fresnelMar ? 1 : 0);
+		glUniform1f(glGetUniformLocation(lightingShader.Program, "time"), (float)glfwGetTime());
+		glUniform1i(glGetUniformLocation(lightingShader.Program, "skyReflect"), 1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, texCieloReflejo);
 		Sea.Draw(lightingShader);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE0);
+		glUniform1i(glGetUniformLocation(lightingShader.Program, "fresnel"), 0);   // el resto sigue con Phong
 
 
 		//Mountein (mounteindew.obj)
@@ -1031,6 +1046,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		play = FrameIndex >= 2;
 		balonBotando = false;
 		interpolation();
+	}
+
+	if (key == GLFW_KEY_F && action == GLFW_PRESS)
+	{
+		fresnelMar = !fresnelMar;
 	}
 
 	if (key == GLFW_KEY_B && action == GLFW_PRESS)

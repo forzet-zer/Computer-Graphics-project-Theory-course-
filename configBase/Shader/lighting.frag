@@ -60,6 +60,12 @@ uniform SpotLight spotLight;
 uniform Material material;
 uniform int transparency;
 
+// Fresnel (solo para el mar): reflejo del cielo que aumenta en angulos rasantes
+uniform int fresnel;            // 0 = Phong normal, 1 = agua con Fresnel
+uniform sampler2D skyReflect;   // textura equirectangular del cielo (unidad 1)
+uniform float time;             // segundos, para mover las ondas
+const float PI = 3.14159265;
+
 // Function prototypes
 vec3 CalcDirLight( DirLight light, vec3 normal, vec3 viewDir );
 vec3 CalcPointLight( PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir );
@@ -70,6 +76,18 @@ void main( )
     // Properties
     vec3 norm = normalize( Normal );
     vec3 viewDir = normalize( viewPos - FragPos );
+
+    if ( fresnel == 1 )
+    {
+        // Ondas: se inclina la normal con senos que avanzan en el tiempo (el plano no se deforma,
+        // solo cambia como refleja la luz y el cielo)
+        vec2 p = FragPos.xz;
+        float dx = 0.06 * cos( p.x * 0.35 + time * 1.3 ) + 0.03 * cos( ( p.x + p.y ) * 0.9 + time * 2.1 );
+        float dz = 0.06 * cos( p.y * 0.28 + time * 1.1 ) + 0.03 * cos( ( p.x - p.y ) * 0.7 + time * 1.7 );
+        // A lo lejos las ondas se ven de menos de un pixel y generan aliasing: se atenuan con la distancia
+        float atenuacion = clamp( 1.0 - length( viewPos - FragPos ) / 60.0, 0.0, 1.0 );
+        norm = normalize( vec3( -dx * atenuacion, 1.0, -dz * atenuacion ) );
+    }
     
     // Directional lighting
     vec3 result = CalcDirLight( dirLight, norm, viewDir );
@@ -83,6 +101,21 @@ void main( )
     // Spot light
     result += CalcSpotLight( spotLight, norm, FragPos, viewDir );
  	
+    if ( fresnel == 1 )
+    {
+        // Aproximacion de Schlick: F = F0 + (1 - F0) * (1 - cos(theta))^5, con F0 = 0.02 para el agua
+        float cosTheta = max( dot( norm, viewDir ), 0.0 );
+        float F = 0.02 + 0.98 * pow( 1.0 - cosTheta, 5.0 );
+
+        // Reflejo del cielo: direccion reflejada -> coordenadas equirectangulares de la textura
+        vec3 R = reflect( -viewDir, norm );
+        R.y = abs( R.y );   // el agua solo refleja el cielo (hemisferio de arriba)
+        vec2 uvCielo = vec2( atan( R.z, R.x ) / ( 2.0 * PI ) + 0.5, acos( clamp( R.y, -1.0, 1.0 ) ) / PI );
+        vec3 cielo = texture( skyReflect, uvCielo ).rgb * dirLight.ambient;   // se oscurece de noche
+
+        result = mix( result, cielo, F );
+    }
+
     color = vec4( result,texture(material.diffuse, TexCoords).a );
 	  if(color.a < 0.1 && transparency==1)
         discard;

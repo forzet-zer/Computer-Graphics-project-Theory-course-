@@ -26,6 +26,7 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Model.h"
+#include "SkinnedModel.h"   // animacion de huesos (FBX de Mixamo)
 
 
 #include <glm/glm.hpp>
@@ -144,6 +145,10 @@ bool dayCycleOn = false;
 
 bool gymLights = true;
 bool gymSpotLight = false;
+
+// Animaciones de huesos del jugador: J = salto (animacion 0), K = remate (si existe Remate.fbx)
+bool animarJugador = false;
+int animJugadorPedida = -1;   // animacion que pidio el teclado; -1 = ninguna
 
 
 // Deltatime
@@ -308,6 +313,18 @@ int main()
 	Model Reflector((char*)"Models/Spotlight/spotlight.obj");
 	
 
+
+	// Jugador con esqueleto de Mixamo (modelo de Gabriel): animacion de huesos
+	SkinnedModel jugadorSkin("../Blender Models/Gabriel_Yukioayax/humano/JugadorMX/Jumping.fbx");
+	jugadorSkin.Reproducir(0, false);   // sin repetir: J lo dispara una vez
+	// Segunda animacion de Mixamo (mismo esqueleto, descargada "Without Skin"). Si el archivo no existe, K no hace nada.
+	std::ifstream existeRemate("../Blender Models/Gabriel_Yukioayax/humano/JugadorMX/Remate.fbx");
+	int animRemate = existeRemate.good() ? jugadorSkin.CargarAnimacion("../Blender Models/Gabriel_Yukioayax/humano/JugadorMX/Remate.fbx") : -1;
+	existeRemate.close();
+	float jugadorAltura = jugadorSkin.maximo.y - jugadorSkin.minimo.y;
+	float jugadorEscala = jugadorAltura > 0.0f ? 1.8f / jugadorAltura : 1.0f;   // 1.8 m de alto
+	std::cout << "Jugador bbox min(" << jugadorSkin.minimo.x << "," << jugadorSkin.minimo.y << "," << jugadorSkin.minimo.z
+		<< ") max(" << jugadorSkin.maximo.x << "," << jugadorSkin.maximo.y << "," << jugadorSkin.maximo.z << ") escala " << jugadorEscala << std::endl;
 
 	Model Sea((char*)"Models/sea.obj");
 	Model Mountein((char*)"Models/mounteindew.obj");
@@ -782,6 +799,27 @@ int main()
 			modelosCarlos[i].Draw(lightingShader);
 		}
 
+		// Jugador animado con huesos: J (salto) o K (remate) se reproducen una vez y regresa a la pose inicial
+		if (animJugadorPedida >= 0) {
+			int pedida = animJugadorPedida == 1 ? animRemate : 0;
+			animJugadorPedida = -1;
+			if (pedida >= 0) { jugadorSkin.Reproducir(pedida, false); animarJugador = true; }
+		}
+		if (animarJugador) {
+			jugadorSkin.Actualizar(deltaTime);
+			if (jugadorSkin.Terminada()) {
+				animarJugador = false;
+				jugadorSkin.Reproducir(0, false);
+				jugadorSkin.Actualizar(0.0f);
+			}
+		}
+		glm::mat4 modelJugador = glm::mat4(1.0f);
+		modelJugador = glm::translate(modelJugador, glm::vec3(2.0f, 0.01f, 10.0f)   /* sobre el piso de la cancha (y = 0.003) */);
+		modelJugador = glm::scale(modelJugador, glm::vec3(jugadorEscala));
+		modelJugador = glm::translate(modelJugador, glm::vec3(0.0f, -jugadorSkin.minimo.y, 0.0f));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelJugador));
+		jugadorSkin.Draw(lightingShader);
+
 		// Reflector (spotlight.obj)
 		glm::mat4 modelReflector = glm::mat4(1.0f);
 		modelReflector = glm::translate(modelReflector, spotPos);
@@ -917,6 +955,16 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 	if (keys[GLFW_KEY_4])
 	{
 		gymSpotLight = !gymSpotLight;
+	}
+
+	if (key == GLFW_KEY_J && action == GLFW_PRESS)
+	{
+		animJugadorPedida = 0;   // salto
+	}
+
+	if (key == GLFW_KEY_K && action == GLFW_PRESS)
+	{
+		animJugadorPedida = 1;   // remate
 	}
 
 	if (keys[GLFW_KEY_L])

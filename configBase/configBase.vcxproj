@@ -153,6 +153,7 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="Shader.h" />
+    <ClInclude Include="SkinnedModel.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C++arnalesVolleyball.cpp" />

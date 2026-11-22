@@ -159,14 +159,37 @@ GLfloat TotaldeltaTimes{ 0.0f };
 
 
 // --- ESTRUCTURA DE KEYFRAMES ---
+// Animacion por keyframes del balon (tecla L): un saque que pasa sobre la red y bota del otro lado.
+// Cada keyframe guarda la posicion del balon y su giro; entre keyframes se interpola con una curva
+// Catmull-Rom (pasa por todos los puntos y queda suave) y el giro se interpola linealmente.
 #define MAX_FRAMES 15
-int i_max_steps = 50;
-int i_curr_steps = 0;
+struct FrameBalon {
+	glm::vec3 pos;   // posicion en el mundo
+	float rot;       // giro acumulado en grados (eje X)
+};
+FrameBalon KeyFrame[MAX_FRAMES];
+int FrameIndex = 0;            // cuantos keyframes hay guardados
+bool play = false;             // true mientras se reproduce
+int playIndex = 0;             // keyframe de inicio del tramo actual
+float tramoT = 0.0f;           // avance dentro del tramo (0..1)
+float duracionTramo = 0.35f;   // segundos por tramo
 
+// Estado del balon que se dibuja
+const glm::vec3 balonReposo(2.6f, 0.105f, 9.6f);   // junto al jugador, apoyado en la cancha
+glm::vec3 balonPos = balonReposo;
+float balonRot = 0.0f;
 
-int FrameIndex = 0;
-bool play = false;
-int playIndex = 0;
+// Animacion por codigo del balon (tecla B): bota en su lugar girando
+bool balonBotando = false;
+float balonTiempoBote = 0.0f;
+
+void GuardarKeyFrame(glm::vec3 pos, float rot)
+{
+	if (FrameIndex >= MAX_FRAMES) return;
+	KeyFrame[FrameIndex].pos = pos;
+	KeyFrame[FrameIndex].rot = rot;
+	FrameIndex++;
+}
 
 
 
@@ -248,6 +271,17 @@ int main()
 	glfwGetFramebufferSize(window, &SCREEN_WIDTH, &SCREEN_HEIGHT);
 
 	glfwSetKeyCallback(window, KeyCallback);
+
+	// Keyframes del saque: del jugador (z = 10) por encima de la red (z = 15, ~2.5 m) hasta el fondo
+	GuardarKeyFrame(glm::vec3(2.4f, 1.1f, 9.9f), 0.0f);     // en la mano
+	GuardarKeyFrame(glm::vec3(2.3f, 2.9f, 10.1f), 120.0f);  // lanzamiento hacia arriba
+	GuardarKeyFrame(glm::vec3(2.0f, 3.5f, 11.8f), 300.0f);  // golpe
+	GuardarKeyFrame(glm::vec3(1.5f, 3.4f, 15.0f), 540.0f);  // pasa sobre la red
+	GuardarKeyFrame(glm::vec3(1.1f, 2.1f, 18.3f), 780.0f);  // cae
+	GuardarKeyFrame(glm::vec3(0.8f, 0.105f, 20.6f), 960.0f); // toca la arena
+	GuardarKeyFrame(glm::vec3(0.6f, 0.7f, 21.6f), 1080.0f); // pequeno rebote
+	GuardarKeyFrame(glm::vec3(0.5f, 0.105f, 22.4f), 1170.0f);
+	GuardarKeyFrame(glm::vec3(0.45f, 0.105f, 22.8f), 1220.0f); // rueda y se detiene
 	glfwSetCursorPosCallback(window, MouseCallback);
 
 	// GLFW ptions
@@ -325,6 +359,9 @@ int main()
 	float jugadorEscala = jugadorAltura > 0.0f ? 1.8f / jugadorAltura : 1.0f;   // 1.8 m de alto
 	std::cout << "Jugador bbox min(" << jugadorSkin.minimo.x << "," << jugadorSkin.minimo.y << "," << jugadorSkin.minimo.z
 		<< ") max(" << jugadorSkin.maximo.x << "," << jugadorSkin.maximo.y << "," << jugadorSkin.maximo.z << ") escala " << jugadorEscala << std::endl;
+
+	// Balon de Gabriel (radio 1 en Blender -> 0.105 m, tamano real de un balon de voleibol)
+	Model BalonYuki((char*)"../Blender Models/Gabriel_Yukioayax/BalonVoley/BalonVoley.obj");
 
 	Model Sea((char*)"Models/sea.obj");
 	Model Mountein((char*)"Models/mounteindew.obj");
@@ -820,6 +857,25 @@ int main()
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelJugador));
 		jugadorSkin.Draw(lightingShader);
 
+		// Balon: keyframes (L) tienen prioridad; si no, bote por codigo (B); si no, en reposo
+		if (!play) {
+			if (balonBotando) {
+				balonTiempoBote += deltaTime;
+				float altura = fabs(sin(balonTiempoBote * 4.0f)) * 0.9f;   // |sen| = rebote con contacto en el suelo
+				balonPos = balonReposo + glm::vec3(0.0f, altura, 0.0f);
+				balonRot += 180.0f * deltaTime;
+			}
+			else {
+				balonPos = balonReposo;
+			}
+		}
+		glm::mat4 modelBalon = glm::mat4(1.0f);
+		modelBalon = glm::translate(modelBalon, balonPos);
+		modelBalon = glm::rotate(modelBalon, glm::radians(balonRot), glm::vec3(1.0f, 0.0f, 0.0f));
+		modelBalon = glm::scale(modelBalon, glm::vec3(0.105f));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelBalon));
+		BalonYuki.Draw(lightingShader);
+
 		// Reflector (spotlight.obj)
 		glm::mat4 modelReflector = glm::mat4(1.0f);
 		modelReflector = glm::translate(modelReflector, spotPos);
@@ -967,9 +1023,20 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		animJugadorPedida = 1;   // remate
 	}
 
-	if (keys[GLFW_KEY_L])
+	if (key == GLFW_KEY_L && action == GLFW_PRESS)
 	{
-		play = !play;
+		// Reinicia el saque desde el primer keyframe
+		playIndex = 0;
+		tramoT = 0.0f;
+		play = FrameIndex >= 2;
+		balonBotando = false;
+		interpolation();
+	}
+
+	if (key == GLFW_KEY_B && action == GLFW_PRESS)
+	{
+		balonBotando = !balonBotando;
+		balonTiempoBote = 0.0f;
 	}
 }
 
@@ -1027,37 +1094,40 @@ void Animation() {
 
 void AnimationKeyFrames()
 {
-	if (play)
+	if (!play) return;
+	tramoT += deltaTime / duracionTramo;
+	while (tramoT >= 1.0f)
 	{
-		if (i_curr_steps >= i_max_steps)
+		tramoT -= 1.0f;
+		playIndex++;
+		if (playIndex > FrameIndex - 2)
 		{
-			playIndex++;
-			if (playIndex > FrameIndex - 2)
-			{
-				printf("Reiniciando animacion desde cero\n");
-				playIndex = 0;         // Regresa al primer par de keyframes
-				resetElements();       // <--- ¡ESTO ES LO CLAVE! Forzar a que el modelo vuelva a la pose del Frame 0
-			}
-			i_curr_steps = 0;
-			interpolation();
-		}
-		else
-		{
-			
-
-			i_curr_steps++;
+			// Termino el ultimo tramo: el balon regresa junto al jugador
+			play = false;
+			resetElements();
+			return;
 		}
 	}
+	interpolation();
 }
-
-
 
 void resetElements(void)
 {
-	
+	playIndex = 0;
+	tramoT = 0.0f;
+	balonPos = balonReposo;
+	balonRot = 0.0f;
 }
 
+// Catmull-Rom entre KeyFrame[i] y KeyFrame[i+1] usando a sus vecinos como puntos de control
 void interpolation(void)
 {
-		}
-
+	int i = playIndex;
+	glm::vec3 p0 = KeyFrame[i > 0 ? i - 1 : i].pos;
+	glm::vec3 p1 = KeyFrame[i].pos;
+	glm::vec3 p2 = KeyFrame[i + 1].pos;
+	glm::vec3 p3 = KeyFrame[i + 2 < FrameIndex ? i + 2 : i + 1].pos;
+	float t = tramoT, t2 = t * t, t3 = t2 * t;
+	balonPos = 0.5f * ((2.0f * p1) + (-p0 + p2) * t + (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2 + (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3);
+	balonRot = glm::mix(KeyFrame[i].rot, KeyFrame[i + 1].rot, t);
+}

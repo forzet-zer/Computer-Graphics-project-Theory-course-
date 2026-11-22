@@ -312,6 +312,33 @@ int main()
 	Model Sea((char*)"Models/sea.obj");
 	Model Mountein((char*)"Models/mounteindew.obj");
 
+	// ---------------------------------------------------------------------------------------
+	// Modelos de Carlos Parra (Blender Models/Carlos_Parra/). Cada uno lleva su posición en la playa,
+	// su giro en Y y la escala que lo deja a su altura real en metros. La altura "y" ya incluye
+	// la altura de la arena (sand.obj) en ese punto, para que queden apoyados en el suelo.
+	// ---------------------------------------------------------------------------------------
+	struct ObjetoCarlos {
+		const char* nombre;
+		const char* ruta;
+		glm::vec3 posicion;
+		float rotY;     // grados
+		float escala;   // uniforme
+	};
+	std::vector<ObjetoCarlos> objetosCarlos = {
+		// Sombrilla con sus accesorios, al este de la zona de descanso
+		// Escalas aumentadas para que se vean bien en la escena (sombrilla 3.2 m, botella 0.8 m,
+		// gorra 0.4 m, lentes 0.25 m de alto); "y" deja la base de cada modelo sobre la arena.
+		{ "Sombrilla", "../Blender Models/Carlos_Parra/Sombrilla/Sombrilla.obj", glm::vec3(14.00f, -0.195f, -9.00f), 0.0f, 0.87190f },
+		{ "BotellaPlastico", "../Blender Models/Carlos_Parra/botella_plastico/botella_plastico.obj", glm::vec3(12.80f, -1.463f, -8.00f), 0.0f, 0.14235f },
+		{ "Gorra", "../Blender Models/Carlos_Parra/gorra/gorra.obj", glm::vec3(15.00f, -1.735f, -7.80f), 20.0f, 0.90910f },
+		{ "LentesSol", "../Blender Models/Carlos_Parra/lentes_sol/lentes_sol.obj", glm::vec3(13.40f, -1.725f, -9.80f), 0.0f, 0.12255f },
+	};
+	std::vector<Model> modelosCarlos;
+	modelosCarlos.reserve(objetosCarlos.size());   // evita copias de Model al crecer el vector
+	for (const ObjetoCarlos& o : objetosCarlos) {
+		modelosCarlos.push_back(Model((char*)o.ruta));
+	}
+
 
 	
 	btRigidBody* PlayaCollision{ LoadRigidCollition("Models/sand.obj", glm::vec3(0.0f,0.0f,0.0f),glm::vec3(0.0f,0.0f,0.0f),glm::vec3(1.0f,1.0f,1.0f)) };
@@ -743,6 +770,17 @@ int main()
 
 		
 
+
+		// Modelos de Carlos Parra: trasladar, girar en Y y escalar
+		for (size_t i = 0; i < objetosCarlos.size(); i++) {
+			const ObjetoCarlos& o = objetosCarlos[i];
+			glm::mat4 modelCarlos = glm::mat4(1.0f);
+			modelCarlos = glm::translate(modelCarlos, o.posicion);
+			modelCarlos = glm::rotate(modelCarlos, glm::radians(o.rotY), glm::vec3(0.0f, 1.0f, 0.0f));
+			modelCarlos = glm::scale(modelCarlos, glm::vec3(o.escala));
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCarlos));
+			modelosCarlos[i].Draw(lightingShader);
+		}
 
 		// Reflector (spotlight.obj)
 		glm::mat4 modelReflector = glm::mat4(1.0f);

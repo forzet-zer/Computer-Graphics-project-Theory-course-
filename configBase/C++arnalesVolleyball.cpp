@@ -28,6 +28,9 @@
 #include "Model.h"
 #include "SkinnedModel.h"   // animacion de huesos (FBX de Mixamo)
 
+#include "AnimatedModel.h"
+
+
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -149,6 +152,10 @@ bool gymSpotLight = false;
 // Animaciones de huesos del jugador: J = salto (animacion 0), K = remate (si existe Remate.fbx)
 bool animarJugador = false;
 int animJugadorPedida = -1;   // animacion que pidio el teclado; -1 = ninguna
+
+
+bool animarGradas = false;
+bool reiniciarGradas = false;
 
 
 // Deltatime
@@ -353,6 +360,12 @@ int main()
 	
 	Model Reflector((char*)"Models/Spotlight/spotlight.obj");
 	
+
+
+	AnimatedModel gradasAnim("../Blender Models/StandsAnim.fbx");
+	//AnimatedModel gradasAnim("../Blender Models/StandsAnimate.glb");
+	gradasAnim.Reproducir(0, false); // true = bucle infinito, o false para activar con teclas
+
 
 
 	// Jugador con esqueleto de Mixamo (modelo de Gabriel): animacion de huesos
@@ -682,6 +695,7 @@ int main()
 
 		modelTrunk = glm::rotate(modelTrunk, anguloTronco, glm::vec3(0.0f, 0.0f, 1.0f));
 		modelTrunk = glm::scale(modelTrunk, glm::vec3(0.10f));
+		modelTrunk = glm::scale(modelTrunk, glm::vec3(0.10f));
 
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelTrunk));
 		PalmeraTronco.Draw(lightingShader);
@@ -925,6 +939,26 @@ int main()
 
 
 
+		if (reiniciarGradas) {
+			gradasAnim.Reproducir(0, false);
+			reiniciarGradas = false;
+			animarGradas = true;
+		}
+		if (animarGradas) {
+			gradasAnim.Actualizar(deltaTime);
+		}
+
+		glm::mat4 modelGradasAnim = glm::mat4(1.0f);
+		modelGradasAnim = glm::translate(modelGradasAnim, glm::vec3(-6.5f, 0.05f, 27.5f));
+		modelGradasAnim = glm::rotate(modelGradasAnim, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		modelGradasAnim = glm::scale(modelGradasAnim, glm::vec3(1.6f)); // ajusta la escala si hace falta
+		gradasAnim.Draw(lightingShader, modelGradasAnim);
+
+
+
+
+
+
 		//glEnable(GL_BLEND);
 		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		//glUniform1i(glGetUniformLocation(lightingShader.Program, "transparency"), 0);
@@ -1088,6 +1122,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		balonBotando = !balonBotando;
 		balonTiempoBote = 0.0f;
 	}
+
+	if (key == GLFW_KEY_G && action == GLFW_PRESS)
+	{
+		reiniciarGradas = true;
+	}
+
 }
 
 void MouseCallback(GLFWwindow* window, double xPos, double yPos)

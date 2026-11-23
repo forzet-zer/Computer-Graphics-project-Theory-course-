@@ -56,9 +56,15 @@
     <ClInclude Include="Model.h">
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
+    <ClInclude Include="SkinnedModel.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimatedModel.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="TokyoSpliffers.cpp">
+    <ClCompile Include="C++arnalesVolleyball.cpp">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
   </ItemGroup>

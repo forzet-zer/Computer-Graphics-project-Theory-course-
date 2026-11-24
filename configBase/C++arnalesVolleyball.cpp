@@ -87,6 +87,10 @@ glm::vec3 pointLightPositions[] = {
 	glm::vec3(8.0f, 1.0f, -15.0f)
 };
 
+//publico
+bool animPublicoMorado = false;
+bool animPublicoAzul = false;
+
 float vertices[] = {
 	 -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
 		0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
@@ -357,6 +361,44 @@ int main()
 		HojasOffset.push_back(i * 0.6f);
 	}
 
+	// publico
+	SkinnedModel publicoMorado("../Blender Models/Publico/publicoRojo.fbx");
+	publicoMorado.Reproducir(0, true); // bucle continuo en gradas1
+	SkinnedModel publicoAzul("../Blender Models/Publico/publicoAzul.fbx");
+	publicoAzul.Reproducir(0, true); // bucle continuo en gradas1
+
+	float alturaMorado = std::max(0.001f, publicoMorado.maximo.y - publicoMorado.minimo.y);
+	float escalaMorado = (1.8f / alturaMorado) * 1.0f; // ajusta 1.8f y escalaGradas1
+
+	float alturaAzul = std::max(0.001f, publicoAzul.maximo.y - publicoAzul.minimo.y);
+	float escalaAzul = (1.8f / alturaAzul) * 1.0f;   // ajusta 1.8f y escalaGradas2
+
+	float posGradas1X = 7.7f;
+	float posGradasY = 0.2f;
+	float posGradas1Z = 20.0f;
+
+	float posGradas2X = 0.0f;
+	float posGradas2Y = 0.05f;
+	float posGradas2Z = 27.7f;
+
+
+	std::vector<glm::vec3> posGradas1 = {
+		glm::vec3(posGradas1X, posGradasY , posGradas1Z - 3.0f),
+		glm::vec3(posGradas1X,        posGradasY, posGradas1Z - 1.5f),
+		glm::vec3(posGradas1X , posGradasY , posGradas1Z),
+		glm::vec3(posGradas1X , posGradasY , posGradas1Z + 1.5f)
+	};
+
+	std::vector<glm::vec3> posGradas2 = {
+		glm::vec3(posGradas2X - 2.0f, posGradasY, posGradas2Z),
+		glm::vec3(posGradas2X - 0.5f,        posGradasY , posGradas2Z),
+		glm::vec3(posGradas2X + 2.0f, posGradasY, posGradas2Z),
+		glm::vec3(posGradas2X + 3.5f, posGradasY , posGradas2Z)
+	};
+
+	Model pelotaVolleyball((char*)"../Blender Models/VolleyBall_ball.obj");
+
+
 
 
 	//Model DogBody((char*)"Models/DogBody.obj");
@@ -423,6 +465,8 @@ int main()
 	// Textura del cielo para el reflejo Fresnel del mar (la misma del skysphere, equirectangular)
 	GLuint texCieloReflejo = TextureFromFile("Hazy_Afternoon_Backplate_001.png", "Models");
 	Model Mountein((char*)"Models/mounteindew.obj");
+
+
 
 	// ---------------------------------------------------------------------------------------
 	// Modelos de Carlos Parra (Blender Models/Carlos_Parra/). Cada uno lleva su posición en la playa,
@@ -804,6 +848,50 @@ int main()
 
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelLeaf));
 			HojasPalmera[i].Draw(lightingShader);
+		}
+
+
+		if (animPublicoMorado) {
+			publicoMorado.Actualizar(deltaTime);
+		}
+		if (animPublicoAzul) {
+			publicoAzul.Actualizar(deltaTime);
+		}
+
+
+		for (const glm::vec3& p : posGradas1) {
+			glm::mat4 model(1.0f);
+			model = glm::translate(model, p);
+			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(escalaMorado));
+			model = glm::translate(model, glm::vec3(0.0f, -publicoMorado.minimo.y, 0.0f));
+
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+			publicoMorado.Draw(lightingShader);
+		}
+
+		// Dibujar publicoAzul en gradas2
+		for (const glm::vec3& p : posGradas2) {
+			glm::mat4 model(1.0f);
+			model = glm::translate(model, p);
+			model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 0.5f, 0.0f)); // ajusta angulo segun la grada
+			model = glm::scale(model, glm::vec3(escalaAzul));
+			model = glm::translate(model, glm::vec3(0.0f, -publicoAzul.minimo.y, 0.0f)); // apoya pies en p.y
+
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+			publicoAzul.Draw(lightingShader);
+		}
+
+		for (int i = 0; i < 5; ++i) {
+			glm::mat4 model(1.0f);
+			model = glm::translate(model, glm::vec3(posGradas2X + 2.0f + i * 0.45f, 0.05f, posGradas2Z + 2.0f));
+			model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.5f));
+			model = glm::scale(model, glm::vec3(0.1f));
+
+
+
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+			pelotaVolleyball.Draw(lightingShader);
 		}
 
 		//glm::mat4 modelTemp = glm::mat4(1.0f); //Temp
@@ -1307,6 +1395,23 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 	{
 		reiniciarArbitro = true;
 	}
+
+	if (key == GLFW_KEY_5 && action == GLFW_PRESS)
+	{
+		if (animPublicoMorado) {
+			animPublicoMorado = false;
+		}
+		else { animPublicoMorado = true; }
+	}
+
+	if (key == GLFW_KEY_6 && action == GLFW_PRESS)
+	{
+		if (animPublicoAzul) {
+			animPublicoAzul = false;
+		}
+		else { animPublicoAzul = true; }
+	}
+
 }
 
 void MouseCallback(GLFWwindow* window, double xPos, double yPos)

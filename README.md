@@ -4,3 +4,5 @@ This is the repository in which we will keep the files belonging to our project 
 Team C++arnales
 
 Our project focuses around a volleyball tournament in which representative mexican teams are participating. Which includes necessary equipment as well as decorative elements
+
+Link to demonstration video: https://www.youtube.com/watch?v=hYzKUvOYaLI

@@ -3,6 +3,10 @@
 #include <cmath>
 
 #include <vector>
+#include <fstream>
+#include <string>
+#include <cstdlib>   // _get_pgmptr
+#include <direct.h>  // _chdir
 
 // GLEW
 #include <GL/glew.h>
@@ -231,6 +235,17 @@ void GuardarKeyFrame(glm::vec3 pos, float rot)
 
 int main()
 {
+	// Si el .exe se abre con doble clic (fuera de Visual Studio, o ya instalado), las rutas
+	// "Models/..." y "Shader/..." se buscan junto al .exe y no en la carpeta desde donde se abrio
+	if (!std::ifstream("Models/sand.obj").good()) {
+		char* rutaExe = nullptr;
+		if (_get_pgmptr(&rutaExe) == 0 && rutaExe) {
+			std::string carpetaExe(rutaExe);
+			carpetaExe = carpetaExe.substr(0, carpetaExe.find_last_of("\\/"));
+			_chdir(carpetaExe.c_str());
+		}
+	}
+
 	// Init GLFW
 	glfwInit();
 	// Set all the required options for GLFW
@@ -362,9 +377,9 @@ int main()
 	}
 
 	// publico
-	SkinnedModel publicoMorado("../Blender Models/Publico/publicoRojo.fbx");
+	SkinnedModel publicoMorado("Models/publico/publicoRojo.fbx");
 	publicoMorado.Reproducir(0, true); // bucle continuo en gradas1
-	SkinnedModel publicoAzul("../Blender Models/Publico/publicoAzul.fbx");
+	SkinnedModel publicoAzul("Models/publico/publicoAzul.fbx");
 	publicoAzul.Reproducir(0, true); // bucle continuo en gradas1
 
 	float alturaMorado = std::max(0.001f, publicoMorado.maximo.y - publicoMorado.minimo.y);

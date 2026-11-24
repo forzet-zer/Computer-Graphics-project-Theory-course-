@@ -77,6 +77,11 @@ void main( )
     vec3 norm = normalize( Normal );
     vec3 viewDir = normalize( viewPos - FragPos );
 
+    // Iluminacion de dos caras: si vemos una cara por su lado de atras (normal volteada, como el
+    // pedazo de arena que se veia cafe oscuro), se voltea la normal para que reciba la luz bien.
+    if ( dot( norm, viewDir ) < 0.0 )
+        norm = -norm;
+
     if ( fresnel == 1 )
     {
         // Ondas: se inclina la normal con senos que avanzan en el tiempo (el plano no se deforma,

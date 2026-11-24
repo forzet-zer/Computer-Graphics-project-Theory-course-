@@ -66,12 +66,18 @@ GLfloat lastX = WIDTH / 2.0;
 GLfloat lastY = HEIGHT / 2.0;
 bool keys[1024];
 bool firstMouse = true;
+
+// F11: alterna entre ventana y pantalla completa. TAB: muestra/oculta el cursor
+bool cambiarPantalla = false;
+bool cursorVisible = false;
+bool pantallaCompleta = false;
+int ventanaX = 100, ventanaY = 100, ventanaAncho = 800, ventanaAlto = 600;
 // Light attributes
 glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
 bool active;
 
 float player_rotation{ 135.0f };
-bool bIsFirstPerson{ false };
+bool bIsFirstPerson{ true };   // arranca en primera persona: la camara gira sobre su propio eje (tecla 1 cambia a tercera)
 bool bIsRunning{ false };
 
 glm::vec3 pointLightPositions[] = {
@@ -156,6 +162,11 @@ int animJugadorPedida = -1;   // animacion que pidio el teclado; -1 = ninguna
 
 bool animarGradas = false;
 bool reiniciarGradas = false;
+
+// Animacion hecha en Blender (exportada a FBX con "Bake Animation"):
+// N = pase del balon entre los ninos (BalonVoleyAnim.fbx)
+bool animarBalonBlender = false;
+bool reiniciarBalonBlender = false;
 
 bool animarBotiquin = false;
 bool reiniciarBotiquin = false;
@@ -245,7 +256,7 @@ int main()
 
 	btScalar mass = 1.0f;
 	btVector3 localInertia(0, 0, 0);
-	sphereShape->calculateLocalInertia(mass, localInertia); 
+	sphereShape->calculateLocalInertia(mass, localInertia);
 
 	btDefaultMotionState* sphereMotionState = new btDefaultMotionState(startTransform);
 	btRigidBody::btRigidBodyConstructionInfo sphereInfo(mass, sphereMotionState, sphereShape, localInertia);
@@ -325,7 +336,7 @@ int main()
 	Model SkyBox((char*)"Models/skysphere.obj");
 
 	//Model chamaca((char*)"Models/MeinGott.glb");
-	Model chamaca((char*)"Models/Player/PlayerIdle1.obj");
+	// Model chamaca((char*)"Models/Player/PlayerIdle1.obj");   // ese archivo no existe y no se dibuja; daba ERROR en consola
 
 
 	Model PalmeraTronco((char*)"Models/palmera/tronco.obj");
@@ -342,7 +353,7 @@ int main()
 		HojasOffset.push_back(i * 0.6f);
 	}
 
-	
+
 
 	//Model DogBody((char*)"Models/DogBody.obj");
 	//Model HeadDog((char*)"Models/HeadDog.obj");
@@ -355,19 +366,23 @@ int main()
 
 	Model Gradas((char*)"Models/Stands/Stands.obj");
 	Model CanchaVolley((char*)"Models/Volleyball_Net/Voleyball_Court.obj");
-	
+
 
 	Model Silla1((char*)"Models/Beach_Chairs/chair1.obj");
 	Model Silla2((char*)"Models/Beach_Chairs/chair2.obj");
 	Model Sombrilla((char*)"Models/Umbrella/umbrella.obj");
-	
+
 	Model Reflector((char*)"Models/Spotlight/spotlight.obj");
-	
+
 
 
 	AnimatedModel gradasAnim("../Blender Models/StandsAnim.fbx");
 	//AnimatedModel gradasAnim("../Blender Models/StandsAnimate.glb");
 	gradasAnim.Reproducir(0, false); // true = bucle infinito, o false para activar con teclas
+
+	// Balon animado en Blender por Gabriel (70 frames: va de un lado a otro en arco)
+	AnimatedModel balonBlender("../Blender Models/Gabriel_Yukioayax/BalonVoley/BalonVoleyAnim.fbx");
+	balonBlender.Reproducir(0, false);
 
 	AnimatedModel botiquinAnim("../Blender Models/Medkit/Medkit.fbx");
 	botiquinAnim.Reproducir(0, false); // Arranca quieto en el frame 0 hasta presionar la tecla
@@ -438,7 +453,7 @@ int main()
 		// Cancha (piso en y ~ 0): companero de Mexico, rivales del otro lado de la red y arbitro
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadorPR/JugadorPR.obj",   glm::vec3(-2.0f, 0.003f, 10.0f),   0.0f },
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadoraHA/JugadoraHA.obj", glm::vec3(-2.0f, 0.003f, 20.0f), 180.0f },
-		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadoraJA/JugadoraJA.obj", glm::vec3( 2.0f, 0.003f, 20.0f), 180.0f },
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadoraJA/JugadoraJA.obj", glm::vec3(2.0f, 0.003f, 20.0f), 180.0f },
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Arbitro/Arbitro.obj",       glm::vec3(-5.5f, 0.003f, 15.0f),  90.0f },
 		// Publico junto a las gradas laterales, echando porras hacia la cancha
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Espectador/Espectador.obj",   glm::vec3(5.8f, 0.001f, 13.0f), -90.0f },
@@ -456,7 +471,7 @@ int main()
 	}
 
 
-	
+
 	btRigidBody* PlayaCollision{ LoadRigidCollition("Models/sand.obj", glm::vec3(0.0f,0.0f,0.0f),glm::vec3(0.0f,0.0f,0.0f),glm::vec3(1.0f,1.0f,1.0f)) };
 	if (PlayaCollision) { dynamicsWorld->addRigidBody(PlayaCollision); }
 
@@ -484,7 +499,7 @@ int main()
 	glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.difuse"), 0);
 	glUniform1i(glGetUniformLocation(lightingShader.Program, "Material.specular"), 1);
 
-	glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.21f, 10000.0f); 
+	glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.21f, 10000.0f);
 
 	// Game loop
 	while (!glfwWindowShouldClose(window))
@@ -499,6 +514,27 @@ int main()
 
 
 		glfwPollEvents();
+
+		// F11: pantalla completa en el monitor principal (o regresa a la ventana normal)
+		if (cambiarPantalla) {
+			cambiarPantalla = false;
+			pantallaCompleta = !pantallaCompleta;
+			if (pantallaCompleta) {
+				glfwGetWindowPos(window, &ventanaX, &ventanaY);
+				glfwGetWindowSize(window, &ventanaAncho, &ventanaAlto);
+				GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+				const GLFWvidmode* modo = glfwGetVideoMode(monitor);
+				glfwSetWindowMonitor(window, monitor, 0, 0, modo->width, modo->height, modo->refreshRate);
+			}
+			else {
+				glfwSetWindowMonitor(window, nullptr, ventanaX, ventanaY, ventanaAncho, ventanaAlto, 0);
+			}
+			glfwGetFramebufferSize(window, &SCREEN_WIDTH, &SCREEN_HEIGHT);
+			glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+			if (SCREEN_HEIGHT > 0)
+				projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.21f, 10000.0f);
+			firstMouse = true;   // evita que la camara brinque al cambiar el tamano
+		}
 		DoMovement();
 		Animation();
 		AnimationKeyFrames();
@@ -597,15 +633,18 @@ int main()
 
 		dayCycle = dayCycleOn ? (sin(TotaldeltaTimes * 0.2f) * 0.5f + 0.5f) : 0.0f;
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.direction"), -0.2f, -1.0f, -0.3f);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"), 1.0f - 0.95f * dayCycle, 1.0f - 0.95f * dayCycle, 1.0f - 0.85f * dayCycle);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"), 0.0f, 0.0f, 0.0f);
+		// Luz del sol: antes solo habia luz ambiente (diffuse = 0) y todo se veia plano.
+		// Ahora se reparte entre ambiente (lados en sombra) y difusa (lados que ve el sol).
+		glm::vec3 luzDia(1.0f - 0.95f * dayCycle, 1.0f - 0.95f * dayCycle, 1.0f - 0.85f * dayCycle);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"), luzDia.x * 0.6f, luzDia.y * 0.6f, luzDia.z * 0.6f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"), luzDia.x * 0.55f, luzDia.y * 0.55f, luzDia.z * 0.55f);
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.specular"), 0.0f, 0.0f, 0.0f);
 
 		//Point light 1
 		glm::vec3 lightColor;
 
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].position"), pointLightPositions[0].x, pointLightPositions[0].y, pointLightPositions[0].z);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].ambient"), gymLights*0.3f, gymLights*0.3f, 0.0f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].ambient"), gymLights * 0.3f, gymLights * 0.3f, 0.0f);
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].diffuse"), gymLights * 1.0f, gymLights * 0.9f, 0.0f);
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "pointLights[0].specular"), gymLights * 1.0f, gymLights * 1.0f, 0.0f);
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[0].constant"), 1.0f);
@@ -639,14 +678,14 @@ int main()
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].linear"), 0.6f);
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "pointLights[3].quadratic"), 0.7f);
 
-		glm::vec3 spotPos(-2.0f, 4.0f, 3.5f);	
-		glm::vec3 spotDir = glm::normalize(glm::vec3(0.1f, -0.25f, 0.5f));	
-	
+		glm::vec3 spotPos(-2.0f, 4.0f, 3.5f);
+		glm::vec3 spotDir = glm::normalize(glm::vec3(0.1f, -0.25f, 0.5f));
+
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.position"), spotPos.x, spotPos.y, spotPos.z);
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.direction"), spotDir.x, spotDir.y, spotDir.z);
 		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.ambient"), gymSpotLight * 0.7f, gymSpotLight * 0.7f, gymSpotLight * 0.7f);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.diffuse"), gymSpotLight * 0.7f, gymSpotLight *  0.7f, gymSpotLight * 0.7f);
-		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.specular"), gymSpotLight *  0.1f, gymSpotLight *  0.1f, gymSpotLight * 0.1f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.diffuse"), gymSpotLight * 0.7f, gymSpotLight * 0.7f, gymSpotLight * 0.7f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "spotLight.specular"), gymSpotLight * 0.1f, gymSpotLight * 0.1f, gymSpotLight * 0.1f);
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.constant"), 1.0f);
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.linear"), 0.005f);
 		glUniform1f(glGetUniformLocation(lightingShader.Program, "spotLight.quadratic"), 0.005f);
@@ -679,7 +718,12 @@ int main()
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPiso));
 		Piso.Draw(lightingShader);
 
+		// El cielo no debe sombrearse: se dibuja solo con ambiente completo y luego se regresa la luz normal
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"), luzDia.x, luzDia.y, luzDia.z);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"), 0.0f, 0.0f, 0.0f);
 		SkyBox.Draw(lightingShader);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.ambient"), luzDia.x * 0.6f, luzDia.y * 0.6f, luzDia.z * 0.6f);
+		glUniform3f(glGetUniformLocation(lightingShader.Program, "dirLight.diffuse"), luzDia.x * 0.55f, luzDia.y * 0.55f, luzDia.z * 0.55f);
 
 
 		//float matrix[16];
@@ -723,7 +767,7 @@ int main()
 
 		PalmeraPos = glm::vec3(-8.0f, -1.0f, 8.0f);
 
-		VelocidadTronco = 0.8f; 
+		VelocidadTronco = 0.8f;
 
 		anguloTronco = sin(glfwGetTime() * VelocidadTronco) * AmplitudTronco;
 
@@ -846,7 +890,7 @@ int main()
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCancha));
 		CanchaVolley.Draw(lightingShader);
 
-	
+
 
 
 
@@ -894,7 +938,7 @@ int main()
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelSilla2));
 		Silla2.Draw(lightingShader);
 
-		
+
 
 
 		// Modelos de Carlos Parra: trasladar, girar en Y y escalar
@@ -999,6 +1043,20 @@ int main()
 		modelGradasAnim = glm::scale(modelGradasAnim, glm::vec3(1.6f)); // ajusta la escala si hace falta
 		gradasAnim.Draw(lightingShader, modelGradasAnim);
 
+		// Balon de Blender: los ninos se lo pasan (tecla N). En Blender el balon mide 2 de diametro y
+		// viaja 20 unidades; el FBX viene x100, asi que con escala 0.00105 queda de 21 cm y recorre ~2 m.
+		if (reiniciarBalonBlender) {
+			balonBlender.Reproducir(0, false);
+			reiniciarBalonBlender = false;
+			animarBalonBlender = true;
+		}
+		if (animarBalonBlender) balonBlender.Actualizar(deltaTime);
+		glm::mat4 modelBalonBlender = glm::mat4(1.0f);
+		modelBalonBlender = glm::translate(modelBalonBlender, glm::vec3(11.8f, -1.67f, -11.85f));   // entre el nino y la nina
+		modelBalonBlender = glm::rotate(modelBalonBlender, glm::radians(23.6f), glm::vec3(0.0f, 1.0f, 0.0f));   // apunta de uno al otro
+		modelBalonBlender = glm::scale(modelBalonBlender, glm::vec3(0.00105f));   // el FBX de Blender viene en centimetros (x100)
+		balonBlender.Draw(lightingShader, modelBalonBlender);
+
 
 		if (reiniciarBotiquin) {
 			botiquinAnim.Reproducir(0, false);
@@ -1039,8 +1097,10 @@ int main()
 		model = glm::translate(model, lightPos);
 		model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		// Draw the light object (using light's vertex attributes)
-		for (GLuint i = 0; i < 4; i++)
+		// Cubos que marcan las luces puntuales: se ven como cuadritos blancos flotando en el cielo.
+		// Cambia a true si quieres verlos para ubicar las luces.
+		const bool mostrarCubosLuz = false;
+		for (GLuint i = 0; mostrarCubosLuz && i < 4; i++)
 		{
 			model = glm::mat4(1);
 			model = glm::translate(model, pointLightPositions[i]);
@@ -1125,7 +1185,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
 	}
 
-	if (keys[GLFW_KEY_1])
+	if (key == GLFW_KEY_1 && action == GLFW_PRESS)
 	{
 		bIsFirstPerson = !bIsFirstPerson;
 	}
@@ -1186,6 +1246,24 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		reiniciarGradas = true;
 	}
 
+	if (key == GLFW_KEY_F11 && action == GLFW_PRESS)
+	{
+		cambiarPantalla = true;         // pantalla completa / ventana
+	}
+
+	if (key == GLFW_KEY_TAB && action == GLFW_PRESS)
+	{
+		// Muestra el cursor (la camara deja de seguir al mouse) o lo vuelve a ocultar
+		cursorVisible = !cursorVisible;
+		glfwSetInputMode(window, GLFW_CURSOR, cursorVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+		firstMouse = true;
+	}
+
+	if (key == GLFW_KEY_N && action == GLFW_PRESS)
+	{
+		reiniciarBalonBlender = true;   // pase del balon (animacion de Blender)
+	}
+
 	if (key == GLFW_KEY_H && action == GLFW_PRESS)
 	{
 		reiniciarBotiquin = true;
@@ -1194,6 +1272,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
 void MouseCallback(GLFWwindow* window, double xPos, double yPos)
 {
+	if (cursorVisible) return;   // con el cursor visible (TAB) la camara no se mueve
+
 	if (firstMouse)
 	{
 		lastX = xPos;

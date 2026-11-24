@@ -160,6 +160,10 @@ bool animarJugador = false;
 int animJugadorPedida = -1;   // animacion que pidio el teclado; -1 = ninguna
 
 
+// Arbitro animado en Blender (R): toca el silbato y senala el lado del punto
+bool animarArbitro = false;
+bool reiniciarArbitro = false;
+
 bool animarGradas = false;
 bool reiniciarGradas = false;
 
@@ -400,6 +404,15 @@ int main()
 	std::cout << "Jugador bbox min(" << jugadorSkin.minimo.x << "," << jugadorSkin.minimo.y << "," << jugadorSkin.minimo.z
 		<< ") max(" << jugadorSkin.maximo.x << "," << jugadorSkin.maximo.y << "," << jugadorSkin.maximo.z << ") escala " << jugadorEscala << std::endl;
 
+	// Arbitro de Gabriel animado en Blender (Arbitro_Anim.blend -> FBX con esqueleto de 19 huesos)
+	SkinnedModel arbitroSkin("../Blender Models/Gabriel_Yukioayax/Personajes/Arbitro/Arbitro_Anim.fbx",
+		"../Blender Models/Gabriel_Yukioayax/Personajes/Arbitro/Arbitro.png");
+	arbitroSkin.Reproducir(0, false);   // quieto en el cuadro 0 hasta presionar R
+	arbitroSkin.Actualizar(0.0f);
+	float arbitroAltura = arbitroSkin.maximo.y - arbitroSkin.minimo.y;
+	float arbitroEscala = arbitroAltura > 0.0f ? 1.75f / arbitroAltura : 1.0f;   // 1.75 m como los demas adultos
+	glm::vec3 arbitroCentro = (arbitroSkin.minimo + arbitroSkin.maximo) * 0.5f;
+
 	// Balon de Gabriel (radio 1 en Blender -> 0.105 m, tamano real de un balon de voleibol)
 	Model BalonYuki((char*)"../Blender Models/Gabriel_Yukioayax/BalonVoley/BalonVoley.obj");
 
@@ -454,7 +467,6 @@ int main()
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadorPR/JugadorPR.obj",   glm::vec3(-2.0f, 0.003f, 10.0f),   0.0f },
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadoraHA/JugadoraHA.obj", glm::vec3(-2.0f, 0.003f, 20.0f), 180.0f },
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadoraJA/JugadoraJA.obj", glm::vec3(2.0f, 0.003f, 20.0f), 180.0f },
-		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Arbitro/Arbitro.obj",       glm::vec3(-5.5f, 0.003f, 15.0f),  90.0f },
 		// Publico junto a las gradas laterales, echando porras hacia la cancha
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Espectador/Espectador.obj",   glm::vec3(5.8f, 0.001f, 13.0f), -90.0f },
 		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Espectadora/Espectadora.obj", glm::vec3(5.8f, 0.001f, 17.0f), -90.0f },
@@ -982,6 +994,28 @@ int main()
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelJugador));
 		jugadorSkin.Draw(lightingShader);
 
+		// Arbitro animado: R reproduce silbato + senal una vez y vuelve al reposo
+		if (reiniciarArbitro) {
+			arbitroSkin.Reproducir(0, false);
+			reiniciarArbitro = false;
+			animarArbitro = true;
+		}
+		if (animarArbitro) {
+			arbitroSkin.Actualizar(deltaTime);
+			if (arbitroSkin.Terminada()) {
+				animarArbitro = false;
+				arbitroSkin.Reproducir(0, false);
+				arbitroSkin.Actualizar(0.0f);
+			}
+		}
+		glm::mat4 modelArbitro = glm::mat4(1.0f);
+		modelArbitro = glm::translate(modelArbitro, glm::vec3(-5.5f, 0.003f, 15.0f));   // junto a la red, viendo la cancha
+		modelArbitro = glm::rotate(modelArbitro, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		modelArbitro = glm::scale(modelArbitro, glm::vec3(arbitroEscala));
+		modelArbitro = glm::translate(modelArbitro, glm::vec3(-arbitroCentro.x, -arbitroSkin.minimo.y, -arbitroCentro.z));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelArbitro));
+		arbitroSkin.Draw(lightingShader);
+
 		// Balon: keyframes (L) tienen prioridad; si no, bote por codigo (B); si no, en reposo
 		if (!play) {
 			if (balonBotando) {
@@ -1267,6 +1301,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 	if (key == GLFW_KEY_H && action == GLFW_PRESS)
 	{
 		reiniciarBotiquin = true;
+	}
+
+	if (key == GLFW_KEY_R && action == GLFW_PRESS)
+	{
+		reiniciarArbitro = true;
 	}
 }
 

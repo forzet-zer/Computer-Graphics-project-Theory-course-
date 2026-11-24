@@ -185,34 +185,57 @@ private:
 		Malla m;
 		m.numIndices = (GLsizei)indices.size();
 
-		// Cargar textura forzada, textura del FBX, o el color difuso del material
+		// Cargar textura forzada, textura del FBX (incrustada o externa), o por nombre/color de material
 		const aiMaterial* mat = scene->mMaterials[mesh->mMaterialIndex];
 		aiString ruta;
+
 		if (!texturaExtra.empty()) {
 			size_t corte = texturaExtra.find_last_of("/\\");
 			m.textura = TextureFromFile(texturaExtra.substr(corte + 1).c_str(), texturaExtra.substr(0, corte));
 		}
 		else if (mat->GetTextureCount(aiTextureType_DIFFUSE) > 0 && mat->GetTexture(aiTextureType_DIFFUSE, 0, &ruta) == AI_SUCCESS) {
 			std::string r = ruta.C_Str();
-			size_t corte = r.find_last_of("/\\");
-			m.textura = TextureFromFile(r.substr(corte == std::string::npos ? 0 : corte + 1).c_str(), directorio);
+			if (!r.empty() && r[0] == '*') {
+				// Textura embebida en Assimp antiguo (*0, *1, etc.)
+				int idx = std::stoi(r.substr(1));
+				if (idx >= 0 && idx < (int)scene->mNumTextures) {
+					const aiTexture* emb = scene->mTextures[idx];
+					if (emb && emb->mHeight == 0) {
+						m.textura = SOIL_load_OGL_texture_from_memory(
+							reinterpret_cast<const unsigned char*>(emb->pcData),
+							emb->mWidth, SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID,
+							SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y
+						);
+					}
+				}
+			}
+			else {
+				size_t corte = r.find_last_of("/\\");
+				std::string nombreArchivo = r.substr(corte == std::string::npos ? 0 : corte + 1);
+				m.textura = TextureFromFile(nombreArchivo.c_str(), directorio);
+				// Si no esta junto al FBX, buscarla en la subcarpeta "textures" desempaquetada por Blender
+				if (m.textura == 0) {
+					m.textura = TextureFromFile(nombreArchivo.c_str(), directorio + "Blender Models/Medkids/textures");
+				}
+			}
 		}
-		else {
+
+		if (m.textura == 0) {
 			aiString nombreMat;
 			mat->Get(AI_MATKEY_NAME, nombreMat);
 			std::string matStr = nombreMat.C_Str();
 
 			if (matStr.find("Wooden") != std::string::npos) {
-				// Pon aqui el nombre real de la textura de madera que esta en tu carpeta Models/Stands/
 				m.textura = TextureFromFile("stands_wood.png", "Models/Stands");
 			}
 			else if (matStr.find("Metal") != std::string::npos) {
-				// Pon aqui el nombre real de la textura de metal que esta en tu carpeta Models/Stands/
 				m.textura = TextureFromFile("stands_metal.png", "Models/Stands");
 			}
 			else {
-				aiColor4D color(0.75f, 0.75f, 0.75f, 1.0f);
+				aiColor4D color(0.85f, 0.85f, 0.85f, 1.0f);
 				aiGetMaterialColor(mat, AI_MATKEY_COLOR_DIFFUSE, &color);
+				if (color.r < 0.05f && color.g < 0.05f && color.b < 0.05f)
+					color = aiColor4D(0.92f, 0.92f, 0.90f, 1.0f);
 				m.textura = crearTexturaColor((unsigned char)(color.r * 255), (unsigned char)(color.g * 255), (unsigned char)(color.b * 255));
 			}
 		}

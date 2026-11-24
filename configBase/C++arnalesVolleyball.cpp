@@ -157,6 +157,9 @@ int animJugadorPedida = -1;   // animacion que pidio el teclado; -1 = ninguna
 bool animarGradas = false;
 bool reiniciarGradas = false;
 
+bool animarBotiquin = false;
+bool reiniciarBotiquin = false;
+
 
 // Deltatime
 GLfloat deltaTime = 0.0f;	// Time between current frame and last frame
@@ -366,6 +369,8 @@ int main()
 	//AnimatedModel gradasAnim("../Blender Models/StandsAnimate.glb");
 	gradasAnim.Reproducir(0, false); // true = bucle infinito, o false para activar con teclas
 
+	AnimatedModel botiquinAnim("../Blender Models/Medkit/Medkit.fbx");
+	botiquinAnim.Reproducir(0, false); // Arranca quieto en el frame 0 hasta presionar la tecla
 
 
 	// Jugador con esqueleto de Mixamo (modelo de Gabriel): animacion de huesos
@@ -695,7 +700,6 @@ int main()
 
 		modelTrunk = glm::rotate(modelTrunk, anguloTronco, glm::vec3(0.0f, 0.0f, 1.0f));
 		modelTrunk = glm::scale(modelTrunk, glm::vec3(0.10f));
-		modelTrunk = glm::scale(modelTrunk, glm::vec3(0.10f));
 
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelTrunk));
 		PalmeraTronco.Draw(lightingShader);
@@ -955,7 +959,20 @@ int main()
 		gradasAnim.Draw(lightingShader, modelGradasAnim);
 
 
+		if (reiniciarBotiquin) {
+			botiquinAnim.Reproducir(0, false);
+			reiniciarBotiquin = false;
+			animarBotiquin = true;
+		}
+		if (animarBotiquin) {
+			botiquinAnim.Actualizar(deltaTime);
+		}
 
+		glm::mat4 modelBotiquin = glm::mat4(1.0f);
+		modelBotiquin = glm::translate(modelBotiquin, glm::vec3(-7.0f, 1.15f, 15.0f)); // Ajusta X, Y, Z donde lo quieras ubicar
+		modelBotiquin = glm::rotate(modelBotiquin, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		modelBotiquin = glm::scale(modelBotiquin, glm::vec3(1.0f)); // Ajusta si sale muy grande o chico
+		botiquinAnim.Draw(lightingShader, modelBotiquin);
 
 
 
@@ -1128,6 +1145,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 		reiniciarGradas = true;
 	}
 
+	if (key == GLFW_KEY_H && action == GLFW_PRESS)
+	{
+		reiniciarBotiquin = true;
+	}
 }
 
 void MouseCallback(GLFWwindow* window, double xPos, double yPos)

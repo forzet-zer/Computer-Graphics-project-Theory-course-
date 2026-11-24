@@ -362,9 +362,9 @@ int main()
 	}
 
 	// publico
-	SkinnedModel publicoMorado("../Blender Models/Publico/publicoRojo.fbx");
+	SkinnedModel publicoMorado("Models/publico/publicoRojo.fbx");
 	publicoMorado.Reproducir(0, true); // bucle continuo en gradas1
-	SkinnedModel publicoAzul("../Blender Models/Publico/publicoAzul.fbx");
+	SkinnedModel publicoAzul("Models/publico/publicoAzul.fbx");
 	publicoAzul.Reproducir(0, true); // bucle continuo en gradas1
 
 	float alturaMorado = std::max(0.001f, publicoMorado.maximo.y - publicoMorado.minimo.y);

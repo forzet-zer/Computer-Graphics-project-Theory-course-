@@ -423,6 +423,38 @@ int main()
 		modelosCarlos.push_back(Model((char*)o.ruta));
 	}
 
+	// ---------------------------------------------------------------------------------------
+	// Personajes de Gabriel (Blender Models/Gabriel_Yukioayax/Personajes/). Salen de sus .blend
+	// (misma malla con esqueleto, distinta textura): se les dio pose en Blender, se aplico el
+	// esqueleto y se exportaron ya en metros (adulto 1.75 m, ninos 1.05 m) con los pies en y = 0
+	// y mirando hacia +Z. Por eso solo se trasladan y se giran; "y" es la altura de la arena.
+	// ---------------------------------------------------------------------------------------
+	struct Personaje {
+		const char* ruta;
+		glm::vec3 posicion;
+		float rotY;     // grados
+	};
+	std::vector<Personaje> personajesGabriel = {
+		// Cancha (piso en y ~ 0): companero de Mexico, rivales del otro lado de la red y arbitro
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadorPR/JugadorPR.obj",   glm::vec3(-2.0f, 0.003f, 10.0f),   0.0f },
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadoraHA/JugadoraHA.obj", glm::vec3(-2.0f, 0.003f, 20.0f), 180.0f },
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/JugadoraJA/JugadoraJA.obj", glm::vec3( 2.0f, 0.003f, 20.0f), 180.0f },
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Arbitro/Arbitro.obj",       glm::vec3(-5.5f, 0.003f, 15.0f),  90.0f },
+		// Publico junto a las gradas laterales, echando porras hacia la cancha
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Espectador/Espectador.obj",   glm::vec3(5.8f, 0.001f, 13.0f), -90.0f },
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Espectadora/Espectadora.obj", glm::vec3(5.8f, 0.001f, 17.0f), -90.0f },
+		// Ninos jugando cerca de la sombrilla de Carlos
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Nino/Nino.obj", glm::vec3(11.0f, -1.751f, -11.5f),  45.0f },
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Nina/Nina.obj", glm::vec3(12.6f, -1.812f, -12.2f), -30.0f },
+		// Salvavidas en la orilla, viendo hacia el mar (+X)
+		{ "../Blender Models/Gabriel_Yukioayax/Personajes/Salvavidas/Salvavidas.obj", glm::vec3(16.0f, -1.940f, -18.0f), 90.0f },
+	};
+	std::vector<Model> modelosPersonajes;
+	modelosPersonajes.reserve(personajesGabriel.size());
+	for (const Personaje& p : personajesGabriel) {
+		modelosPersonajes.push_back(Model((char*)p.ruta));
+	}
+
 
 	
 	btRigidBody* PlayaCollision{ LoadRigidCollition("Models/sand.obj", glm::vec3(0.0f,0.0f,0.0f),glm::vec3(0.0f,0.0f,0.0f),glm::vec3(1.0f,1.0f,1.0f)) };
@@ -874,6 +906,15 @@ int main()
 			modelCarlos = glm::scale(modelCarlos, glm::vec3(o.escala));
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelCarlos));
 			modelosCarlos[i].Draw(lightingShader);
+		}
+
+		// Personajes de Gabriel: ya vienen en metros, solo trasladar y girar en Y
+		for (size_t i = 0; i < personajesGabriel.size(); i++) {
+			glm::mat4 modelPersonaje = glm::mat4(1.0f);
+			modelPersonaje = glm::translate(modelPersonaje, personajesGabriel[i].posicion);
+			modelPersonaje = glm::rotate(modelPersonaje, glm::radians(personajesGabriel[i].rotY), glm::vec3(0.0f, 1.0f, 0.0f));
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelPersonaje));
+			modelosPersonajes[i].Draw(lightingShader);
 		}
 
 		// Jugador animado con huesos: J (salto) o K (remate) se reproducen una vez y regresa a la pose inicial
